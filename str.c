@@ -1,9 +1,8 @@
 #define _BSD_SOURCE
-#include "endianess.h"
 #include <string.h>
 #include "str.h"
 
-str_t *get_str(uint32_t size)
+str_t *str_get(uint32_t size)
 {
 	str_t *s;
 
@@ -24,42 +23,41 @@ str_t *get_str(uint32_t size)
 	return s;
 }
 
-void put_str(str_t *s)
+void str_put(str_t *s)
 {
-	if (!s)
-		return;
-
-	free(s->buf);
-	free(s);
+	if (s) {
+		free(s->buf);
+		free(s);
+	}
 }
 
-static int str_verify(str_t *str)
+static int str_verify(str_t *s)
 {
-	if (!str)
+	if (!s)
 		return -1;
 
-	if (str->used > str->size) {
+	if (s->used > s->size) {
 		fprintf(stderr, "str error: allocated %u, used %u",
-			str->size, str->used);
+			s->size, s->used);
 		return -1;
 	}
 
-	if (str->pos > str->used) {
+	if (s->pos > s->used) {
 		fprintf(stderr, "str error : position %u, used %u",
-			str->pos, str->used);
+			s->pos, s->used);
 		return -1;
 	}
 
-	if (str->pos > str->size) {
+	if (s->pos > s->size) {
 		fprintf(stderr, "str error : position %u, allocated %u",
-			str->pos, str->size);
+			s->pos, s->size);
 		return -1;
 	}
 
 	return 0;
 }
 
-static inline int realloc_str(str_t *str, int needed)
+static inline int realloc_str(str_t *s, int needed)
 {
 	int smallest = 1;
 	char *new = NULL;
@@ -69,47 +67,43 @@ static inline int realloc_str(str_t *str, int needed)
 		smallest <<= 1;
 
 	needed = smallest;
-	new = realloc(str->buf, needed);
+	new = realloc(s->buf, needed);
 
 	if (!new)
 		return -1;
 
-	str->buf = new;
-	str->size = needed;
+	s->buf = new;
+	s->size = needed;
 
-	return str_verify(str);
+	return str_verify(s);
 }
 
-int str_add_data(str_t *str, const void *data, uint32_t len)
+int str_add_data(str_t *s, const void *data, uint32_t len)
 {
-	if (str_verify(str))
-		return -1;
-
-	if (str->size < (str->used + len)) {
-		if (realloc_str(str, str->used + len) < 0)
+	if (s->size < (s->used + len)) {
+		if (realloc_str(s, s->used + len) < 0)
 			return -1;
 	}
 
-	memcpy(str->buf + str->used, data, len);
+	memcpy(s->buf + s->used, data, len);
 
-	str->used += len;
-	str_verify(str);
+	s->used += len;
+	str_verify(s);
 
 	return 0;
 }
 
-
-int str_get_data(str_t *str, void *data, uint32_t len)
+int str_get_data(str_t *s, void *data, uint32_t len)
 {
 	/*
 	 * Check for a integer overflow first, then check
 	 * if not enough data is in the buffer.
 	 */
-	if (str->pos + len < len || str->pos + len > str->used)
-		return 0;
+	if (s->pos + len < len || s->pos + len > s->used)
+		return -1;
 
-	memcpy(data, str->buf + str->pos, len);
-	str->pos += len;
+	memcpy(data, s->buf + s->pos, len);
+	s->pos += len;
 
-	return len;
+	return 0;
 }
